@@ -1,7 +1,14 @@
-import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  CACHE_MANAGER,
+  HttpException,
+  HttpStatus,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import db from '../../db/db';
 import { HttpService } from '@nestjs/axios';
 import { lastValueFrom } from 'rxjs';
+import { Cache } from 'cache-manager';
 
 export interface IQueryModel {
   address: string;
@@ -10,7 +17,10 @@ export interface IQueryModel {
 
 @Injectable()
 export class GeoService {
-  constructor(private readonly httpService: HttpService) {}
+  constructor(
+    private readonly httpService: HttpService,
+    @Inject(CACHE_MANAGER) private cacheManager: Cache,
+  ) {}
   apiKey = 'AIzaSyClVO_D6Z7axEDqnuBxAOgDLyRdbEMTSpg';
 
   async buildLngLatByAddress(query: IQueryModel): Promise<object> {
@@ -43,7 +53,7 @@ export class GeoService {
     }
   }
 
-  private async getAddressFromGoogle(
+  async getAddressFromGoogle(
     address: string,
     apiType: 'fullAddress' | 'countryOnly' = 'fullAddress',
   ): Promise<object> {
@@ -74,19 +84,22 @@ export class GeoService {
     apiType: 'fullAddress' | 'countryOnly' = 'fullAddress',
   ): Promise<any> {
     try {
-      return await db.get(`${apiType}_${address}`);
+      //return await db.get(`${apiType}_${address}`);
+      return await this.cacheManager.get(`${apiType}_${address}`);
     } catch (err) {
       console.log(`Address ${address} does not exist locally`);
     }
   }
 
-  private async saveAddressLocally(
+  async saveAddressLocally(
     address: string,
     value: any,
     apiType: 'fullAddress' | 'countryOnly' = 'fullAddress',
   ) {
     try {
-      await db.put(`${apiType}_${address}`, value);
+      //await db.put(`${apiType}_${address}`, value);
+
+      await this.cacheManager.set(`${apiType}_${address}`, value);
     } catch (err) {
       throw new HttpException(
         `Failed to save address locally. Error: ${err}`,
